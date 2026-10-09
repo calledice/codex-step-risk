@@ -1,0 +1,41 @@
+{
+  "description": "Observe supported Codex tool and subagent outcomes; do not change execution.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/hook.mjs\"",
+            "timeout": 8,
+            "statusMessage": "Estimating step risk"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/hook.mjs\"",
+            "timeout": 8,
+            "statusMessage": "Estimating step risk"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/hook.mjs\"",
+            "timeout": 8,
+            "statusMessage": "Estimating step risk"
+          }
+        ]
+      }
+    ]
+  }
+}

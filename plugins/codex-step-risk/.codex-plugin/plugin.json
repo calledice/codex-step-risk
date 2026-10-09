@@ -1,0 +1,7 @@
+{
+  "name": "codex-step-risk",
+  "version": "0.1.0",
+  "description": "Experimental live Bayesian attribution for observable Codex tool and subagent events",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json"
+}

@@ -1,0 +1,20 @@
+{
+  "name": "codex-step-risk",
+  "interface": {
+    "displayName": "Codex Step Risk"
+  },
+  "plugins": [
+    {
+      "name": "codex-step-risk",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex-step-risk"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "codex-step-risk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Experimental live Bayesian attribution for observable Codex events",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "license": "MIT"
+}

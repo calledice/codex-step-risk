@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "codex-step-risk",
+  "version": "0.1.0",
+  "description": "Experimental live Bayesian attribution for observable Codex tool and subagent events",
+  "repository": "https://github.com/calledice/codex-step-risk",
+  "license": "MIT",
+  "extensions": {
+    "com.openai": {
+      "hooks": "./hooks/hooks.json",
+      "interface": {
+        "displayName": "Codex Step Risk",
+        "shortDescription": "Live uncalibrated attribution after observable steps",
+        "developerName": "calledice",
+        "category": "Productivity",
+        "capabilities": [
+          "Read"
+        ]
+      }
+    }
+  }
+}
