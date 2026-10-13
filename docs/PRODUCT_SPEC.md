@@ -1,35 +1,13 @@
 # Codex Step Risk 产品约定
 
-版本：0.1.0 试用版（2026-10-09）
+版本：0.4.0（2026-10-10）。本约定替代 0.3.0 的总任务风险和排查占比主体验。
 
-## 目标与边界
+用户需要每个 step 可能引起最终任务失败的概率。实现采用即时本地估计与可选 Luna 评估，每个步骤显示独立百分数、预测依据和观测事实。主页面不再显示归一化责任份额、剩余质量或固定 20% 任务风险。
 
-把现有实时贝叶斯归因原型适配为可从 GitHub marketplace 安装的 Codex 插件。每次支持的工具调用结束后，根据结构化错误信号和工具/子 agent 角色，更新当前可观测步骤的责任质量；子 agent 结束时记录可识别的 agent 候选；当前 turn 结束时给出摘要。不重放工具或模型，不预先指定步骤总数，不改变工具输入、输出或执行决策。
+完整定义、API 和 AC-1 至 AC-8 验收条件见 [STEP_FAILURE_V04_SPEC](STEP_FAILURE_V04_SPEC.md)。计算先验与边界见 [MODEL](MODEL.md)，操作说明见 [README](../README.md)，实际验证见 [VALIDATION](VALIDATION.md)。
 
-Codex Hooks 提供 `PostToolUse` 和 `SubagentStop`，但没有稳定的每次模型内部推理步骤结束事件。这里的“步骤”明确指**可观测工具结果或子 agent 结束事件**。`PostToolUse` 的公共字段包含 `session_id`、`turn_id`、`tool_name`、`tool_use_id`、`tool_response`，不保证子 agent ID；因此普通工具候选不能可靠归属到某个子 agent。`SubagentStop` 自带 `agent_id` 和 `agent_type`，可单独定位该 agent 结束边界。
+交付范围包括插件采集、持久化缓存、桌面浏览器卡片面板、任务目标/数据模式设置、单步/批量/自动新步骤评估，以及可上传的插件 ZIP。自动评估仅在面板打开时工作；历史记录由用户主动评估。没有实际 hook 的内部思考步骤不在本产品观测范围内。
 
-## 概率语义
+默认只发结构化字段，自动调用关闭。本用户已授权采用脱敏上下文摘要，写入本机设置，不改变可分发 ZIP 的隐私默认值。密钥沿用 config.toml 提供方配置，不进入制品。没有结构化判据时保留完整本地响应，并显示未判定，不伪造成功/失败。
 
-`pCurrent` 是模型在当前 turn 的已见可观测边界和残余质量之间分配给本事件的归一化权重。它以“任务最终失败，且决定性责任点属于本 turn 的可观测边界或模型残余集合”为条件。残余质量涵盖未来事件、不可观测推理步骤、其他 turn 及未建模故障域。该值不是任务失败率、已校准频率或因果证明。每条输出固定标记 `experimental_uncalibrated`。
-
-## 用户体验
-
-- 通过 `codex plugin marketplace add calledice/codex-step-risk --ref v0.1.0` 加入来源，再用 `codex plugin add codex-step-risk@codex-step-risk` 安装。
-- 插件的 `PostToolUse` hook 自动写入 `PLUGIN_DATA/predictions.jsonl`，并用简短 `systemMessage` 显示当前事件估计；`Stop` 显示本 turn 的 Top 候选。
-- 必须由用户在 Codex `/hooks` 中审查并信任该插件 hook，之后才会执行。
-- 原始 prompt、工具参数、模型正文、工具输出正文和错误消息均不写入预测日志。只保存结构化状态、事件 ID、工具名、角色与证据码。
-
-## 技术路线
-
-1. 纯 JavaScript 模型每个 turn 保留 future/residual 质量、最多 128 个候选与被压缩的历史质量。新事件按架构角色调整 hazard，按结构化错误信号乘似然比，再归一化。
-2. `PostToolUse` 只检查 `tool_response` 的显式 `isError` / `is_error` / 非零退出码等字段；不做正文关键字搜索。`SubagentStop` 只读 `agent_id`、`agent_type`，不读取 `last_assistant_message`。
-3. 每次 hook 都是短命进程；在 `PLUGIN_DATA` 下按 session/turn 存持久状态，使用原子锁与原子文件替换处理并发，失败时不阻断 Codex。
-4. 根 `plugin.json` 使用 Agent Plugins schema；`extensions.com.openai.hooks` 指向插件目录中的 hook 配置；`.agents/plugins/marketplace.json` 供 GitHub marketplace 安装。另附一个 `skills/step-risk/SKILL.md` 说明如何解释日志。
-
-## 验收
-
-- marketplace 和插件清单可解析，hook 脚本在 Windows 的 Codex CLI 环境能启动。
-- 观测到的工具结果立即产生一条带概率质量与校准标记的预测；无预设长度，长期运行内存按候选上限有界。
-- 结构化错误提升当前候选，角色改变先验，多个 turn 隔离，并发更新不丢失。
-- 插件不读取或记录原文，不改变 agent/tool 控制流；真实 Codex hook 信任与显示行为在试装环境中验证。
-- 发布到 `calledice/codex-step-risk`，文档明确说明可观测性与概率边界。
+本次不修改 Codex 宿主程序，也不自动上传插件商店或推送仓库。页面展示的是模型概率预测，准确性尚未经真实任务结果验证。

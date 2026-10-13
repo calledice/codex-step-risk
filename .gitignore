@@ -1,5 +1,7 @@
 node_modules/
+.ontoly/
 *.jsonl
 *.tmp
+*-local.zip
 .env
 .env.*

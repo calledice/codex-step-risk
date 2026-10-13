@@ -1,14 +1,120 @@
 # 验证记录
 
-日期：2026-10-09。开发环境：Codex CLI 0.162.0-alpha.2、Node.js 24.14.1、Windows。
+日期：2026-10-10。开发环境：Codex CLI 0.162.0-alpha.2、Node.js 24.14.1、Windows。
 
-## 完成的检查
+## 0.2.0 历史验证记录
 
-- `node --test`：11 项通过。覆盖概率质量守恒、一万事件的有界候选、迟到结构化错误、角色先验、事件去重、turn 隔离、工具和子 agent 元数据提取、私密正文不进入日志、8 个进程并发更新。
-- 三个脚本通过 `node --check`；`package.json`、插件 `plugin.json`、`hooks.json`、marketplace JSON 均可解析。
-- 对照 [官方插件打包文档](https://developers.openai.com/plugins/build/plugins) 核对 portable manifest、`extensions.com.openai.hooks` 与 marketplace 源路径；对照 [官方 Hooks 文档](https://developers.openai.com/codex/hooks) 核对 `PostToolUse`、`SubagentStop`、`Stop` 的输入与 JSON 输出。
-- 进程测试实际从 stdin 发送合成 Codex hook JSON，并读取 stdout 消息、`PLUGIN_DATA` 状态文件和 JSONL。
+- `node --test`：23 项通过。覆盖结构化成功/错误/未知结果及冲突失败标记、纯文本 Bash 响应不误判退出码、用户级 hook 适配入口、私密正文不落日志或事件记录、交错 turn 隔离、状态丢失恢复、270 步后的旧 ID 去重、8 个 hook 进程并发、异常输入退出码 0、模型质量守恒与联合概率门禁。
+- `node --check`：`hook.mjs`、`journal.mjs`、`prediction.mjs` 均通过；`package.json`、插件 `plugin.json`、`hooks.json`、marketplace JSON 均可解析。
+- 进程测试从 stdin 发送合成 Codex hook JSON，检查 stdout `systemMessage`、`PLUGIN_DATA` 状态、元数据事件文件和 JSONL。无成功样本时 `taskFailureRisk.value` 与 `jointOriginFailure.value` 均为 `null`。
+- `codex plugin marketplace add --help` 确认本地路径是 CLI 支持的 marketplace 来源；已将本机原 GitHub 来源的 0.1.0 安装切换为此仓库的本地 marketplace，并成功安装 0.2.0。`codex plugin list --json` 显示新版本已启用；安装缓存中的五个脚本与工作区源码 SHA-256 一致。
+- Ontoly 重建：28 文件、88 节点、151 关系、0 诊断，哈希 `0lhq8ug`；coverage、consistency、trustworthiness 均为 100%。提交用图已移除本机绝对路径。
+- `git diff --check` 通过。Git 提示工作树的 LF 将在后续 Git 操作中转为 CRLF，不影响本次检查。
 
-## 尚需试装确认
+## 真实 Codex 核验与限制
 
-安装到真实 Codex host 后，需要审查并信任 hook，再运行一个实际工具任务，确认 host 的 `PLUGIN_ROOT` 路径展开、`systemMessage` 展示和实际 `tool_response` 形状。模型参数尚无 Codex 原生成功/失败与人工责任样本校准，始终输出 `experimental_uncalibrated`。
+- 用户给出的桌面任务 `01a123cd-b8e3-76e1-a875-aa524783fac7` 的两次命令分别以 0、7 退出，但没有 Step Risk 消息。插件 0.2.0 已启用；在新启动的 Codex CLI 0.162.0-alpha.2 中，`/hooks` 对插件的 `PostToolUse` 显示 `Installed 0`，且没有插件 hook 信任记录。移除旧版兼容清单并重新安装后仍为 0；不是评分脚本把这两条事件算成了空结果。
+- 临时用户级 hook 配置能被 `/hooks` 发现：`PostToolUse`、`SubagentStop`、`Stop` 各 1 个，审查信任后为 active。Windows 命令须写为 `node "<脚本路径>"`；以带引号的 Node 绝对路径开头会让 PowerShell hook 退出 1。当前机器的 `~/.codex/hooks.json` 已采用前者。
+- 在真实 CLI 任务中，两次独立 Bash 调用分别以 0、7 退出。两次均显示 `[codex-step-risk] event`，turn 结束时显示摘要；JSONL 中有两个独立事件且无命令输出正文。运行使用 `-s danger-full-access`，因为该 CLI 环境的受限模式另有 `helper_unknown_error: setup refresh had errors`，会使终端工具无法启动。
+- 该 CLI 的 Bash `PostToolUse.tool_response` 是纯文本 stdout，未包含退出码。因此两条事件都被正确标为 `observed outcome=unknown`，权重约 3.6% 和 3.5%，不能据此区分退出 0 与 7。界面显示退出码，但 hook 输入没有；要纳入退出码需 Codex 提供结构化结果或另外接入运行时事件。
+- 尚未在用户原桌面任务的新 turn 中复测用户级 hook。既有任务不会追溯生成事件。当前模型参数仍是专家设定；没有同分布的成功/失败任务和责任标注，不能验证或显示数值型任务失败概率。
+
+## 桌面结果面板（0.2.0 历史验证，2026-10-10）
+
+- 新增本机只读面板，直接读取用户级 hook 的元数据 JSONL；不接触 Codex transcript 或工具正文。HTTP 服务器仅监听 `127.0.0.1`，校验 Host，并对读取的文件数量、大小、事件数和返回字段设限。
+- `node --test`：25 项通过；`dashboard-data.mjs`、`dashboard-server.mjs`、`dashboard.js` 的 `node --check` 通过；`git diff --check` 通过。
+- 当前桌面会话 `01a12420-7415-7390-8cc4-927eec8ef506` 的面板 API 返回 6 个回合；在 Codex 内浏览器实测页面显示自动刷新、候选排序、步骤记录，以及“任务失败概率：不可用”。最初两次独立命令对应的回合有 2 个 `Bash` 事件，权重分别为 3.6% 与 3.5%，观测结果都为“未知”。当前回合的事件数随 hook 日志增长而自动更新。
+- 面板是 Codex 中打开的本机浏览器标签页；它不修改官方桌面客户端的聊天消息渲染，也不会在重启后自动启动本机服务。官方 hook 文档将 `systemMessage` 定义为 UI 或事件流警告；上一轮只检查会话历史，不能单凭历史中没有消息断言实时警告没有显示。
+
+## 0.3.0 当前验证（2026-10-10）
+
+- `node --test`：32 项通过，覆盖固定假设规则风险、明确错误/成功/未知信号、结构化判据、完整未知响应写入日志、超过旧文件大小上限的响应读取、并发与恢复。相关脚本 `node --check`、`git diff --check` 通过。
+- 使用隔离的合成日志在 Codex 内浏览器检查面板：未知事件显示响应预览与完整展开；退出码 7 判为错误、退出码 0 判为成功，判断依据分别列出；风险在一个错误和一个成功后为 36.3%，与规则公式一致。完整响应中的 `<img src=x onerror=alert(1)>` 保持为纯文本，没有生成图片节点。自动刷新后，已经展开的响应保持展开。
+- 真实旧日志在 `127.0.0.1:43148` 的新版服务下显示 20.0% 起点与新文案；旧日志没有保存的响应无法补回。`127.0.0.1:43147` 上仍是旧版 API，返回 `taskFailureRisk.status=unavailable`，不应把该端口视为已升级。本次没有复测真实新 hook 事件，也没有经验校准结果。
+- 用户明确选择缺少成功判据时将完整响应保存到本地 `logs/` 和 `events/`；这会包含可能敏感的工具输出或子 agent 最后消息。面板仅监听回环地址，页面以 `textContent` 显示响应。
+- `codex-step-risk-0.3.0-local.zip` 含插件目录下的 17 个文件；逐项 SHA-256 与源码一致，压缩包 SHA-256 为 `DD2461F5629AB30C59E6E06600CE96C73CCEEEF29442DF106ADFDF0928DEF8C9`。这只验证本地包内容，未验证公共插件目录是否接受带 hook 的 ZIP。
+- `codex plugin add codex-step-risk@codex-step-risk` 已将本机安装更新为 0.3.0，`codex plugin list --json` 显示启用；缓存中的 17 个文件与仓库源码逐项 SHA-256 一致。用户级 `~/.codex/hooks.json` 的三个事件命令已从 0.2.0 改为 0.3.0 缓存路径，并保留原配置备份 `hooks.json.bak-step-risk-0.2.0-20261010`；配置 JSON 可解析，三个目标脚本均存在。当前桌面进程的最新日志仍标记 `modelVersion=0.2.0`，说明本进程尚未加载新 hook；需要重启 Codex 并在 `/hooks` 核对、信任新命令后才能验证真实新事件。
+
+## 排查顺序与 Luna 解读增量验证（2026-10-10）
+
+- `node --test`：36 项通过；`luna-explain.mjs`、`dashboard-server.mjs`、`dashboard.js` 的 `node --check` 通过；5 个 JSON 清单可解析；`git diff --check` 通过。接口测试覆盖只发送白名单结构化判据、跨源拒绝、非法事件选择、超限请求、缺少密钥、上游错误不泄露内部信息。
+- 在隔离的合成事件面板（43149）实测：主区显示“第 1 位”“仍需排查”和“未判定”；12.0%/70.0% 仅在展开“模型技术数据”后出现；完整合成响应留在本地观测栏。点击 Luna 解读后显示“AI 解释，不参与判定”及依据和限制，两秒自动刷新后解释仍可见。此测试使用服务端注入的合成解释，不代表真实 OpenAI 调用成功。
+- 用同样只含结构化判据的合成请求尝试真实 `gpt-6-luna` 调用，OpenAI 官方地址返回 HTTP 401、错误码 `invalid_api_key`；当时没有真实模型输出可验。后续发现此密钥属于 `config.toml` 中的自定义模型提供方，已在下节修正路由。
+- 当时已重启 43147 和 43148 的本机服务。两端 `/api/dashboard` 返回 10 个当前会话回合及 `lunaAvailable=false`；`POST /api/explain` 返回 503。后续配置提供方接入见下节。
+- 首版候选包 `codex-step-risk-0.3.0-luna-local.zip` 当时包含 18 个插件文件，SHA-256 为 `B6664D352E3C8FADC9F4413D986781EE4D95E2D592A54D62D7E414631A3DCB24`；同名包随后已重建，当前内容见下节。此前的 `codex-step-risk-0.3.0-local.zip` 是旧包，不包含 Luna 模块。
+
+## 复用 Codex 提供方凭据（2026-10-10）
+
+- 官方 [Codex Configuration Reference](https://learn.chatgpt.com/docs/config-file/config-reference) 说明 `model_providers.<id>.base_url` 是提供方 API 地址，`env_key` 是提供密钥的环境变量，`wire_api` 使用 Responses。当前用户级 `config.toml` 选中自定义提供方，`env_key` 指向 `OPENAI_API_KEY`；此前的 401 是把这把提供方密钥发往 OpenAI 官方地址所致。
+- 面板现按当前 `model_provider` 解析地址和 `env_key`，仅从环境读取密钥；不读取或展示密钥内容，不把密钥写入 ZIP。自定义地址须为 HTTPS。面板 API 仅向本地页面返回提供方名称和主机名，供用户在点击前确认目的地。
+- 用合成的 `unknown` 事件判据向当前配置的提供方真实调用 `gpt-6-luna`，获得结构化中文解释、依据和限制；未发送任何本地响应正文或真实事件。合成事件端到端 HTTP 请求首次遇到上游瞬时 502，再次调用返回 200 和结构化解释。`node --test` 39 项通过，新增测试覆盖提供方选择、地址与密钥变量绑定、缺失密钥/不安全地址禁用；相关脚本 `node --check` 和 `git diff --check` 通过。
+- 在 Luna 输出上限调整为 900 后重新启动 43147 与 43148 两个本机服务；两端页面返回 HTTP 200，`/api/dashboard` 返回 `lunaAvailable=true` 和当前配置的提供方标识。Codex 内浏览器 43148 此前重新加载后，显示提供方目的地和可用的“Luna 解读”按钮。本轮没有把真实会话事件发送给模型。
+- 此阶段 `codex-step-risk-0.3.0-luna-local.zip` 包含 19 个插件文件，逐项与源码字节一致且 ZIP 完整性检查通过；包内未包含当前环境密钥。SHA-256：`57EA2A68C2D7EB634E309B3F280D08549595EF124C2C4EB10D153DDE04089767`。同名包随后已重建，当前内容见下节。尚未验证公共插件目录是否接受 ZIP。
+
+## Luna 失败提示与有界重试（2026-10-10）
+
+- 用户报告 `step-risk-ok` 与 `step-risk-fail` 两行显示“Luna 暂时无法解读，请稍后重试”。本次修改前，分别直接调用当前提供方、通过 43147 的 `/api/explain` 请求以及在 Codex 内浏览器点击，两条目标事件均成功返回解释；接口请求耗时约 2–4 秒。因此未复现当时的失败，不能把上一次故障确定归因为密钥、超时或上游 5xx。旧实现把全部调用异常归并为同一 502 和固定提示，没有保留可辨认的原因。
+- 为已确认的诊断缺口增加安全错误分类：配置缺失、密钥拒绝、限流、请求被拒绝、提供方 5xx、超时、网络中断、输出长度不足、拒答和无效格式。页面显示固定中文原因及安全的 HTTP 状态/尝试次数，不显示上游响应正文、异常原文或密钥。临时网络故障、超时、HTTP 408 和 5xx 最多重试一次，间隔 500 毫秒，每次请求仍限制 15 秒。认证、限流、格式错误等不会自动重试。
+- 新增回归测试在原实现上 4 项失败；实现后 `node --test` 全量 46 项通过，覆盖临时失败后恢复、永久故障不重试、最多两次尝试、格式错误分类和 API 错误信息脱敏。三个改动脚本的 `node --check` 和 `git diff --check` 通过。
+- 重启 43147 和 43148 后，两端 API 读取正常、当前使用自定义提供方。使用 43147 最新页面实际点击用户报告的两条事件，均显示“AI 解释，不参与判定”及中文解释。请求仅发送已授权的白名单结构化判据与指标。两行依旧“未判定”，因为 hook 日志只有响应文本而没有退出码，Luna 不补造判据。
+- 使用隔离合成服务验证页面先显示“等待 Luna 提供方响应超时”“已自动重试 1 次”和“重试解读”，再次点击后显示合成成功结果；此项只验证错误展示和交互，不代表发生过真实上游超时。合成服务和临时日志已清理。本机截图 `luna-recovered.jpg` 未纳入仓库。
+- 当前 `codex-step-risk-0.3.0-luna-local.zip` 已重建，19 项均与插件源码 SHA-256 一致，完整读取通过，未包含当前密钥。ZIP SHA-256：`C832293EBFCAD15D79CC3C0E7C9546EF6370026B0FE1EA45A9277D5C9FA954E2`。没有上传或验证公共插件目录的接收结果。
+
+## 0.4.0：每步最终失败概率（2026-10-10）
+
+本阶段以 [0.4.0 契约](STEP_FAILURE_V04_SPEC.md) 为准。主指标是每个步骤独立的模型概率，按问题发生、未被消除、最终影响三个顺次条件因素相乘；旧权重不参与计算，校准不是显示数值的前置条件。
+
+### 自动化与审查
+
+- 最终 `node --test`：77 项通过，0 失败、0 跳过；Node 测试进程成功。15 个插件 mjs 与 dashboard.js 的 `node --check` 通过。最终 `git -c core.autocrlf=false diff --check` 通过（修正新写文档/manifest 的 CRLF 后复查）。
+- 独立审查修复三个 P2：显示窗口超 300 步使旧缓存失效；编辑设置期间遗漏新步骤自动评估；浏览器临时 Luna 结果遮住服务端已失效缓存。后端回归覆盖额外 6 条前序上下文、同请求合并、设置变化取消旧数据模式队列、无效模型输出/损坏缓存回退、旧日志、hook 并发与摘要脱敏。
+- UI 代理的 7 组 VM 交互回归通过；独立 reviewer 复验编辑期补评和缓存失效。主线程在真实 Codex 浏览器验证操作，不以 VM 代替渲染证据。
+
+### 真实面板与模型
+
+- 43147、43148 均返回 `version=0.4.0`，读取当前自定义提供方及其环境密钥；没有打印、保存或打包密钥。原两条 Bash 记录均有本地 4.5% 估计，点击批量评估后变为 Luna 数值，并保持原始“未判定”观测。
+- 真实弱证据调用暴露模型把 hook 观测缺失误归为执行器缺失的倾向。已补充观察者/执行器区分、预期退出和工具名不代表实际 shell 的指令，并将评估器指纹升级为 v3 使旧评估失效。最终两条记录返回 6.0% / 11.4%，依据质量均 low。仍不能把 AI 提出的缺失/失败假设当成已观察事实；这些旧记录没有动作和退出码，数值不用于证明预测质量。
+- 使用两个含明确动作/结构化判据的合成案例真实调用：用户预期退出 7 的只读探针为 `0.000096`（0.0096%），误删数据库配置并留下无效 JSON 的未修复编辑为 `0.51205`（51.205%）。理由分别识别“符合预期”和“明确违反目标”。这验证接口与判断机制，不构成准确率评估，未要求固定输出值。
+- 页面刷新后保留已完成 Luna 结果；另启一个全新临时面板服务、禁止其实际调用模型，真实缓存请求返回 HTTP 200、`cached=true`、`source=luna`、value 0.06，随后关闭临时服务，证明启动后可复用持久缓存。
+- `scripts/verify-dashboard-ui.mjs` 提供隔离的无网络 UI 测试：成功 1.2%、动作失败 21%、未知 4.5%；模拟 Luna 网络错误后卡片保留 21%，显示具体网络错误和重试按钮；按概率排序为 #2、#3、#1。此故障是注入场景，不是声称真实提供方故障。
+- 页面已验证 AI 输入预览、批量队列状态、排序、故障回退和缓存刷新。真实渲染宽度分别为 1265 和 749 CSS px，未横向溢出；请求 420 px 的浏览器覆盖没有得到实际 420 px 视口，因此不声明已验证该宽度。布局保留窄屏 CSS，待真实更窄宿主验证。
+- 本机截图 `step-risk-v04-live.jpg`、`step-risk-v04-fallback.jpg` 未纳入仓库。第二个为隔离合成数据。临时视口覆盖已重置，隔离标签页已关闭。
+
+### 安装与制品
+
+- `codex plugin add codex-step-risk@codex-step-risk` 安装 0.4.0，列表显示 installed/enabled=true。插件缓存与源码 23 文件逐项一致。三个用户级 hook 路径已由 0.3.0 更新至 0.4.0，原 hooks.json 备份为 `hooks.json.backup-v03-20261010-163715`。
+- 对已安装的 0.4.0 hook 直接输入隔离结构化错误，实际写出 modelVersion=0.4.0、outcome=error、stepFailure=0.21，退出 0。用户本机默认启用 context_summary、自动调用保持关闭；分发包仍是 structured + autoAssess=false。当前开发会话和原测试会话已填入目标。
+- **宿主激活限制**：当前会话最后一条宿主自动日志仍是 0.3.0，更新 hook 路径后没有新的自动记录。不能据 CLI installed/enabled 推断当前桌面会话已经热加载或信任新 hook。用户需重启 Codex/重新打开会话，并在 `/hooks` 核对新版本路径及信任；未自动绕过 hook 信任。面板和旧日志浏览已正常可用。
+- `codex-step-risk-0.4.0-local.zip`：插件根目录直接入包，23 文件逐项 SHA-256 与源码一致，46948 字节；不含用户设置、日志、config.toml、环境文件或当前密钥。SHA-256：`FE2B75C7077FD23DD42EBBA2432AF52C9FB0290859999007956C743D3C2A0285`。
+- 没有提交/推送仓库，没有上传公共插件目录；尚未验证该目录对 ZIP 的接收结果。两个常驻服务共享持久缓存，但在途去重仅限各进程；只在一个面板启用自动评估以免同时重复请求。
+
+AC-1 至 AC-5、AC-7 的计算/边界/缓存用自动化及真实 API 验证；AC-6 已在上述实际视口完成，420 px 未取得证据；AC-8 本机文件安装与制品完成，宿主新会话加载仍需上述激活动作。预测准确性和实际因果关系不在本轮验证结论内。
+
+## 0.4.1：独立浏览器 AI 评估 HTTP 403（2026-10-10）
+
+### 复现与原因
+
+- 用户在独立 Edge/Chrome 中再次点击仍得到 HTTP 403。临时诊断捕获其请求为 `Host: 127.0.0.1:43147`、`Origin: http://127.0.0.1`、`Sec-Fetch-Site: same-origin`、`Sec-Fetch-Mode: cors`；内置浏览器对照请求的 Origin 则包含 `:43147`。旧服务要求 Origin 与包含端口的 Host 严格相等，独立浏览器的请求因此在调用 Luna 前被拒绝。
+- 已确认的是收到的 Origin 缺少端口；没有证据确定是浏览器、扩展还是代理修改了它。此前关于 `Origin: null` 或 `no-referrer` 的猜测没有得到该次诊断支持。
+
+### 修复与安全边界
+
+- 每个服务进程生成 256 位随机页面令牌，通过禁止缓存的 `/api/dashboard` 返回，只保存在服务及页面内存。三个 POST 接口均要求 `X-Step-Risk-Token`，且在任何设置写入、缓存操作或模型调用之前校验。
+- Host 必须是允许的回环主机及实际监听端口。除原有精确 Origin 外，仅兼容同一主机名的无端口 Origin，并要求 `Sec-Fetch-Site: same-origin` 和正确令牌。异站、其他显式端口、`null`、缺失 Origin、主机别名互换仍被拒绝。服务不开放 CORS，POST 继续要求 JSON。
+- 前端明确使用 same-origin 请求及 referrer policy，服务也使用同源 referrer policy。令牌过期时直接读取新令牌、重新检查页面状态，再最多重试一次；不对其他 403、上游错误或网络失败自动重发 POST。来源、地址和令牌错误分别返回可辨认的中文提示。
+- 本次没有改变概率算法、模型请求证据范围或持久缓存指纹。
+
+### 验证证据
+
+- 新增服务端六组回归在旧实现上全部失败，首项重现 `/api/assess` 的 `403 != 200`；实现后通过。客户端代理报告六项旧行为失败，实现后 20 项交互回归通过。
+- 主线程最终运行 `node --test`：103 项通过、0 失败、0 跳过，退出码 0。独立只读审查运行来源安全及客户端 26 项测试全部通过，未发现本次范围内 P1/P2 问题。测试覆盖所有写接口、捕获的请求头、令牌失效、跨源拒绝、服务重启、最多一次重试、队列不死锁和过期页面取消。
+- 两个正式服务重启后，43147 与 43148 均返回 `version=0.4.1`、有效页面令牌和可用 Luna 配置。临时请求头诊断脚本、监听器及其两个临时输出文件已移除。
+- 内置浏览器刷新 0.4.1 后，对开发会话一个未评估步骤实际点击，看到“AI 已评估”和 Luna 的 0.2% 显示值。随后向真实 43147 服务重放捕获的无端口 Origin 请求并附新页面令牌，返回 HTTP 200、`cached=true`、`source=luna`，没有重复调用模型。
+- 本机截图 `step-risk-v041-assessed.jpg` 未纳入仓库。独立 Edge 控制连接不可用；已请用户刷新独立浏览器并点击复验，尚未收到最终反馈，不能把请求头回归或内置浏览器结果称为已通过独立浏览器验收。
+
+### 本地安装与 ZIP
+
+- `codex plugin add codex-step-risk@codex-step-risk --json` 安装 0.4.1；列表显示 installed/enabled=true。安装缓存 23 个文件逐项 SHA-256 与插件源码一致。
+- 本次补丁仅影响面板请求流程，保留三个用户级 hook 的 0.4.0 路径及原运行时，未额外变更 hook 信任配置。现有宿主收集流程继续使用其已加载入口；0.4.1 分发包包含新版本标识。两个本地面板服务运行当前源码的正式服务器。
+- `codex-step-risk-0.4.1-local.zip`：23 文件，47548 字节，插件根目录直接入包，完整性和逐文件字节校验通过；不包含设置、日志、测试、config.toml 或环境凭据。压缩前已按当前环境中的密钥/令牌值扫描源码，不含这些值。
+- ZIP SHA-256：`EB68F5262088B77266DF9938765D727770F7FD9240ABB44E46510CC96A056A0E`。未提交、推送或上传公共插件目录。

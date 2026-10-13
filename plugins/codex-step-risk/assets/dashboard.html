@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Step Risk · 每步失败概率</title>
+  <link rel="stylesheet" href="/dashboard.css">
+  <script src="/dashboard.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <div>
+        <div class="eyebrow">CODEX STEP RISK <span id="version">0.4.1</span></div>
+        <h1>每一步，对最终结果的影响</h1>
+        <p class="intro">估计这一步留下的问题，最终导致当前任务失败的概率。</p>
+      </div>
+      <div class="status"><span id="statusDot" class="status-dot"></span><span id="statusText">连接中</span></div>
+    </header>
+
+    <section class="model-note" aria-label="概率含义">
+      <strong>每步独立估计，无需加总为 100%</strong>
+      <p>根据该步完成时的信息预测；多个步骤可能共同导致失败。这是模型估计，尚未用真实任务结果验证准确性。</p>
+    </section>
+
+    <section class="workspace-controls" aria-label="会话与任务目标">
+      <div class="selection-grid">
+        <label class="field" for="sessionSelect"><span>会话</span><select id="sessionSelect" aria-label="选择会话"></select></label>
+        <label class="field" for="turnSelect"><span>回合 <small id="turnCount"></small></span><select id="turnSelect" aria-label="选择回合"></select></label>
+      </div>
+
+      <details id="settingsDetails" class="settings-details">
+        <summary><span>任务目标与 AI 设置</span><small id="goalSummary">正在读取…</small></summary>
+        <form id="settingsForm">
+          <label class="field" for="taskGoal"><span>这个会话要完成什么？</span><textarea id="taskGoal" rows="3" maxlength="2000" placeholder="例如：修复登录失败，并通过登录与权限回归测试。可补充验收要求。"></textarea></label>
+          <p class="field-hint">所有回合共用此目标。留空时按通用完成要求估计，判断依据会较少。</p>
+          <label class="field" for="dataMode"><span>发送给 Luna 的数据</span><select id="dataMode"><option value="structured">仅结构化判据与指标</option><option value="context_summary">脱敏上下文摘要（含目标、动作与响应摘要）</option></select></label>
+          <p id="dataModeHelp" class="field-hint"></p>
+          <label class="checkbox-field"><input id="autoAssess" type="checkbox"><span>自动评估新步骤<small>仅在页面打开时运行；初次打开不补评历史记录。</small></span></label>
+          <div class="settings-actions"><button id="saveSettings" type="submit" class="button primary" disabled>保存设置</button><span id="settingsStatus" class="inline-status" role="status"></span></div>
+        </form>
+      </details>
+    </section>
+
+    <section class="steps-section" aria-label="步骤失败概率">
+      <div class="section-heading"><div><h2>步骤记录 <span id="eventCount">0</span></h2><p id="detailTitle">等待事件</p></div><span id="lastUpdated" class="updated">等待数据</span></div>
+      <div class="step-controls">
+        <label class="sort-field" for="sortSelect"><span>排序</span><select id="sortSelect"><option value="time">按步骤时间</option><option value="probability">按失败概率从高到低</option></select></label>
+        <button id="assessBatch" type="button" class="button primary" disabled>AI 评估当前回合</button>
+      </div>
+      <p id="lunaProviderNotice" class="provider-notice">正在读取 Luna 提供方…</p>
+      <p id="queueStatus" class="queue-status" role="status" aria-live="polite" hidden></p>
+      <p id="emptyMessage" class="empty">当前会话还没有步骤记录。运行工具或完成子 agent 后，此处会自动刷新。</p>
+      <div id="stepList" class="step-list"></div>
+      <p class="footnote">观测结果保留工具的实际成功、失败或未判定状态；执行成功也可能留下问题，执行报错也不一定导致最终任务失败。只记录可观测的工具与子 agent 步骤。</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "codex-step-risk",
-  "version": "0.1.0",
-  "description": "Experimental live Bayesian attribution for observable Codex tool and subagent events",
+  "version": "0.4.1",
+  "description": "Independent model estimates of each step contributing to final task failure",
   "repository": "https://github.com/calledice/codex-step-risk",
   "license": "MIT",
   "extensions": {
@@ -10,7 +10,8 @@
       "hooks": "./hooks/hooks.json",
       "interface": {
         "displayName": "Codex Step Risk",
-        "shortDescription": "Live uncalibrated attribution after observable steps",
+        "shortDescription": "Per-step task failure estimates",
+        "longDescription": "Show an independent final-task-failure probability estimate for each observable step, with local priors, optional Luna assessment, evidence and persistent local caching.",
         "developerName": "calledice",
         "category": "Productivity",
         "capabilities": [

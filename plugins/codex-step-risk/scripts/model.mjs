@@ -1,4 +1,6 @@
-export const MODEL_VERSION = '0.1.0'
+import { nextRiskScore } from './risk.mjs'
+
+export const MODEL_VERSION = '0.4.1'
 export const CALIBRATION = 'experimental_uncalibrated'
 export const SCOPE = 'conditional_on_eventual_failure_and_observable_turn_responsibility'
 
@@ -8,7 +10,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   maxCandidates: 128,
   topK: 3,
   roleOffsets: Object.freeze({ planner: 0.15, executor: 0.2, verifier: 0, other: 0 }),
-  likelihoodRatios: Object.freeze({ no_hard_signal: 0.25, tool_error: 8 }),
+  likelihoodRatios: Object.freeze({ no_hard_signal: 0.25, tool_error: 8, unknown_outcome: 1 }),
 })
 
 const ROLES = new Set(Object.keys(DEFAULT_CONFIG.roleOffsets))
@@ -46,6 +48,8 @@ function validateObservation(value) {
   if (!ROLES.has(value.role)) throw new RangeError('unknown role')
   if (typeof value.actor !== 'string' || value.actor.length === 0) throw new TypeError('actor required')
   if (typeof value.toolName !== 'string') throw new TypeError('toolName must be a string')
+  if (value.outcome !== undefined && !['error', 'success', 'unknown'].includes(value.outcome))
+    throw new RangeError('unknown outcome')
   if (!Array.isArray(value.evidenceCodes) || value.evidenceCodes.length === 0)
     throw new TypeError('evidenceCodes must be non-empty')
   for (const code of value.evidenceCodes)
@@ -63,7 +67,7 @@ export function initialState(sessionId, turnId) {
   requireId('turnId', turnId)
   return {
     schemaVersion: 1, sessionId, turnId, ordinal: 0,
-    future: 1, otherPast: 0, candidates: [], recentIds: [],
+    future: 1, otherPast: 0, candidates: [], recentIds: [], riskScore: 0,
   }
 }
 
@@ -74,19 +78,22 @@ export function snapshotFor(state, current = null, config = DEFAULT_CONFIG) {
     .sort((a, b) => b.weight - a.weight)
     .slice(0, config.topK)
     .map(({ ordinal, eventId, kind, role, actor, toolName, weight }) =>
-      ({ ordinal, eventId, kind, role, actor, toolName, probability: weight }))
+      ({ ordinal, eventId, kind, role, actor, toolName, weight }))
   return {
     modelVersion: MODEL_VERSION, calibration: CALIBRATION, scope: SCOPE,
     sessionId: state.sessionId, turnId: state.turnId, ordinal: state.ordinal,
     eventId: current?.eventId ?? null, kind: current?.kind ?? 'summary',
     role: current?.role ?? null, actor: current?.actor ?? null,
     toolName: current?.toolName ?? null,
+    outcome: current?.outcome ?? null,
     evidenceCodes: current ? [...current.evidenceCodes] : [],
     priorHazard: current?.priorHazard ?? null,
     pCurrent: current?.weight ?? null,
     pCurrentGivenNoEarlier: current
       ? current.weight / (current.weight + state.future) : null,
     pRetained, pOtherPast: state.otherPast, pResidual: state.future,
+    riskScore: state.riskScore ?? 0,
+    outcomeEvidence: current?.outcomeEvidence ?? [],
     retainedCandidates: state.candidates.length, topCandidates,
   }
 }
@@ -101,6 +108,7 @@ export function observe(previous, observation, config = DEFAULT_CONFIG) {
     ...previous,
     candidates: previous.candidates.map(candidate => ({ ...candidate })),
     recentIds: [...previous.recentIds, observation.eventId].slice(-256),
+    riskScore: nextRiskScore(previous.riskScore, observation.outcome),
   }
   const survival = 1 - config.recoveryHazard
   const past = state.otherPast +
@@ -115,7 +123,9 @@ export function observe(previous, observation, config = DEFAULT_CONFIG) {
   const current = {
     ordinal: state.ordinal + 1, eventId: observation.eventId,
     kind: observation.kind, role: observation.role, actor: observation.actor,
-    toolName: observation.toolName, evidenceCodes, priorHazard,
+    toolName: observation.toolName, outcome: observation.outcome ?? 'unknown',
+    evidenceCodes, priorHazard,
+    outcomeEvidence: observation.outcomeEvidence ?? [],
     weight: state.future * priorHazard * ratio,
   }
   state.future *= 1 - priorHazard

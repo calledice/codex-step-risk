@@ -1,11 +1,12 @@
 {
   "name": "codex-step-risk",
-  "version": "0.1.0",
+  "version": "0.4.1",
   "private": true,
   "type": "module",
-  "description": "Experimental live Bayesian attribution for observable Codex events",
+  "description": "Independent model estimates of each step contributing to final task failure",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "dashboard": "node plugins/codex-step-risk/scripts/dashboard-server.mjs"
   },
   "engines": {
     "node": ">=22.19.0"
